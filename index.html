@@ -4,53 +4,40 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Grade 8 AI Learning Hub</title>
-
   <style>
     * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      padding: 40px 20px;
-      font-family: "Times New Roman", serif;
+      padding: 35px 20px;
       background: #f0f5ff;
       color: #17324d;
+      font-family: "Times New Roman", serif;
     }
 
-    main {
-      max-width: 850px;
-      margin: auto;
-    }
-
+    main { max-width: 850px; margin: auto; }
     header, footer { text-align: center; }
-
-    p {
-      font-size: 19px;
-      line-height: 1.6;
-    }
+    p { font-size: 20px; line-height: 1.6; }
 
     section {
-      margin: 24px 0;
-      padding: 24px;
       background: white;
+      padding: 24px;
+      margin: 20px 0;
       border-radius: 14px;
     }
 
     h2 { margin-top: 0; }
 
-    .links {
-      display: grid;
-      gap: 14px;
-    }
-
     a {
       display: block;
+      margin-top: 12px;
       padding: 18px;
+      border-radius: 10px;
       background: #174a80;
       color: white;
-      font-size: 21px;
       text-align: center;
       text-decoration: none;
-      border-radius: 10px;
+      font-size: 22px;
     }
 
     a:hover { background: #10365e; }
@@ -60,32 +47,27 @@
       outline-offset: 4px;
     }
 
-    footer {
-      margin-top: 35px;
-      line-height: 1.6;
-    }
+    .message { font-size: 17px; }
+    footer { margin-top: 35px; line-height: 1.6; }
   </style>
 </head>
-
 <body>
   <main>
     <header>
       <h1>Grade 8 AI Learning Hub</h1>
-      <p>
-        Welcome, AI explorers! Complete the lessons and
-        worksheets at your own pace.
-      </p>
+      <p>Explore all six weeks and complete the activities
+        and worksheets at your own pace.</p>
     </header>
 
-    <p id="status" role="status">Loading your lessons…</p>
-    <div id="lessons"></div>
+    <p id="status" role="status">Loading lessons…</p>
+    <div id="weeks"></div>
 
     <section>
-      <h2>Showcase Your Understanding</h2>
+      <h2>Showcase Your Learning</h2>
       <p>
         After finishing, create a poster digitally or on paper.
         Include three key ideas, one real-life AI example,
-        and one tip for using AI responsibly.
+        and one responsible AI tip.
         Use your own words and clear visuals.
       </p>
     </section>
@@ -99,77 +81,72 @@
   <script>
     const owner = "br3khawlabanydomi-rgb";
     const repository = "G8-Bridge";
-    const branch = "main";
+    const base = `https://${owner}.github.io/${repository}/`;
+
+    const status = document.getElementById("status");
+    const weeks = document.getElementById("weeks");
+    const panels = new Map();
+
+    // Always display all six weeks.
+    for (let number = 1; number <= 6; number++) {
+      const section = document.createElement("section");
+      const heading = document.createElement("h2");
+      heading.textContent = `Week ${number}`;
+
+      const content = document.createElement("div");
+      const message = document.createElement("p");
+      message.className = "message";
+      message.textContent = "Looking for lesson websites…";
+
+      content.appendChild(message);
+      section.append(heading, content);
+      weeks.appendChild(section);
+      panels.set(number, content);
+    }
 
     async function loadLessons() {
-      const status = document.getElementById("status");
-      const container = document.getElementById("lessons");
-
       try {
-        const api =
+        const response = await fetch(
           `https://api.github.com/repos/${owner}/${repository}` +
-          `/git/trees/${branch}?recursive=1`;
+          "/git/trees/main?recursive=1",
+          { cache: "no-store" }
+        );
 
-        const response = await fetch(api);
-
-        if (!response.ok) {
-          throw new Error("Unable to load the folder list.");
-        }
+        if (!response.ok) throw new Error("Folder list unavailable");
 
         const data = await response.json();
 
-        if (data.truncated) {
-          throw new Error("The folder list is incomplete.");
+        if (data.truncated || !Array.isArray(data.tree)) {
+          throw new Error("Incomplete folder list");
         }
 
-        const pages = data.tree
-          .filter(file =>
-            file.type === "blob" &&
-            file.path.startsWith("Term1/") &&
-            file.path.endsWith("/index.html")
-          )
-          .sort((a, b) =>
-            a.path.localeCompare(b.path, undefined, { numeric: true })
-          );
+        const files = data.tree.filter(file =>
+          file.type === "blob" &&
+          /^Term1\/Week0*[1-6]\//.test(file.path) &&
+          file.path.endsWith("/index.html")
+        );
 
-        if (!pages.length) {
-          status.textContent =
-            "No lesson websites were found inside Term1.";
-          return;
-        }
+        for (let number = 1; number <= 6; number++) {
+          const panel = panels.get(number);
+          panel.replaceChildren();
 
-        const groups = new Map();
+          const matches = files.filter(file => {
+            const match = file.path.match(/^Term1\/Week0*(\d+)\//);
+            return match && Number(match[1]) === number;
+          }).sort((a, b) => a.path.localeCompare(b.path));
 
-        for (const page of pages) {
-          const parts = page.path.split("/");
-          const week = parts[1];
-
-          if (!groups.has(week)) {
-            groups.set(week, []);
+          if (!matches.length) {
+            const message = document.createElement("p");
+            message.className = "message";
+            message.textContent =
+              "No index.html was found inside this week's folder.";
+            panel.appendChild(message);
+            continue;
           }
 
-          groups.get(week).push(page.path);
-        }
-
-        for (const [week, paths] of groups) {
-          const section = document.createElement("section");
-          const heading = document.createElement("h2");
-
-          heading.textContent = week.replace(
-            /^Week0*(\d+)$/,
-            "Week $1"
-          );
-
-          section.appendChild(heading);
-
-          const links = document.createElement("div");
-          links.className = "links";
-
-          for (const path of paths) {
-            const parts = path.split("/");
+          matches.forEach((file, index) => {
+            const parts = file.path.split("/");
             const category = parts[2];
-            const link = document.createElement("a");
-
             const labels = {
               Core: "Core Lesson",
               Lab: "Practical Lab",
@@ -178,41 +155,35 @@
 
             let label = labels[category] || "Learning Activity";
 
-            const sameCategory = paths.filter(
-              item => item.split("/")[2] === category
+            const sameCategory = matches.filter(
+              item => item.path.split("/")[2] === category
             );
 
             if (sameCategory.length > 1) {
-              const position = sameCategory.indexOf(path) + 1;
-              label += ` ${position}`;
+              label += " " + (sameCategory.indexOf(file) + 1);
             }
 
+            const link = document.createElement("a");
             link.textContent = label;
 
-            link.href = "./" + path
-              .split("/")
+            // Use the exact uploaded path, including index.html.
+            link.href = base + parts
               .map(part => encodeURIComponent(part))
               .join("/");
 
-            links.appendChild(link);
-          }
-
-          section.appendChild(links);
-          container.appendChild(section);
+            panel.appendChild(link);
+          });
         }
 
         status.textContent = "Choose a lesson below to begin.";
       } catch (error) {
         status.textContent =
-          "The lesson list could not load. Please refresh in a few minutes.";
+          "The lesson list could not load. Check your internet " +
+          "connection and refresh. The repository must be public.";
 
-        const fallback = document.createElement("a");
-        fallback.textContent = "Open Week 1 Practical Lab";
-        fallback.href =
-          "./Term1/Week01/Lab/" +
-          "ICS_AI-CS_Bridging_G08_TNS_W01_Lab_Website/";
-
-        container.appendChild(fallback);
+        for (const panel of panels.values()) {
+          panel.textContent = "Lesson list unavailable.";
+        }
       }
     }
 
